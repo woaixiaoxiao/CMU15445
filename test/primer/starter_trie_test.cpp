@@ -78,7 +78,7 @@ TEST(StarterTest, TrieNodeRemoveTest) {
   EXPECT_EQ(child_node, nullptr);
 }
 
-TEST(StarterTest, DISABLED_TrieInsertTest) {
+TEST(StarterTest, TrieInsertTest) {
   {
     Trie trie;
     trie.Insert<std::string>("abc", "d");
@@ -129,74 +129,74 @@ TEST(StarterTest, DISABLED_TrieInsertTest) {
   }
 }
 
-// TEST(StarterTrieTest, DISABLED_RemoveTest) {
-//   {
-//     Trie trie;
-//     bool success = trie.Insert<int>("a", 5);
-//     EXPECT_EQ(success, true);
-//     success = trie.Insert<int>("aa", 6);
-//     EXPECT_EQ(success, true);
-//     success = trie.Insert<int>("aaa", 7);
-//     EXPECT_EQ(success, true);
+TEST(StarterTrieTest, RemoveTest) {
+  {
+    Trie trie;
+    bool success = trie.Insert<int>("a", 5);
+    EXPECT_EQ(success, true);
+    success = trie.Insert<int>("aa", 6);
+    EXPECT_EQ(success, true);
+    success = trie.Insert<int>("aaa", 7);
+    EXPECT_EQ(success, true);
 
-//     success = trie.Remove("aaa");
-//     EXPECT_EQ(success, true);
-//     trie.GetValue<int>("aaa", &success);
-//     EXPECT_EQ(success, false);
+    success = trie.Remove("aaa");
+    EXPECT_EQ(success, true);
+    trie.GetValue<int>("aaa", &success);
+    EXPECT_EQ(success, false);
 
-//     success = trie.Insert("aaa", 8);
-//     EXPECT_EQ(success, true);
-//     EXPECT_EQ(trie.GetValue<int>("aaa", &success), 8);
-//     EXPECT_EQ(success, true);
+    success = trie.Insert("aaa", 8);
+    EXPECT_EQ(success, true);
+    EXPECT_EQ(trie.GetValue<int>("aaa", &success), 8);
+    EXPECT_EQ(success, true);
 
-//     // Remove non-existant keys should return false
-//     success = trie.Remove("aaaa");
-//     EXPECT_EQ(success, false);
+    // Remove non-existant keys should return false
+    success = trie.Remove("aaaa");
+    EXPECT_EQ(success, false);
 
-//     success = trie.Remove("aa");
-//     EXPECT_EQ(success, true);
-//     success = trie.Remove("a");
-//     EXPECT_EQ(success, true);
-//     success = trie.Remove("aaa");
-//     EXPECT_EQ(success, true);
-//   }
-// }
+    success = trie.Remove("aa");
+    EXPECT_EQ(success, true);
+    success = trie.Remove("a");
+    EXPECT_EQ(success, true);
+    success = trie.Remove("aaa");
+    EXPECT_EQ(success, true);
+  }
+}
 
-// TEST(StarterTrieTest, DISABLED_ConcurrentTest1) {
-//   Trie trie;
-//   constexpr int num_words = 1000;
-//   constexpr int num_bits = 10;
+TEST(StarterTrieTest, ConcurrentTest1) {
+  Trie trie;
+  constexpr int num_words = 1000;
+  constexpr int num_bits = 10;
 
-//   std::vector<std::thread> threads;
-//   threads.reserve(num_words);
+  std::vector<std::thread> threads;
+  threads.reserve(num_words);
 
-//   auto insert_task = [&](const std::string &key, int value) {
-//     bool success = trie.Insert(key, value);
-//     EXPECT_EQ(success, true);
-//   };
-//   for (int i = 0; i < num_words; i++) {
-//     std::string key = std::bitset<num_bits>(i).to_string();
-//     threads.emplace_back(std::thread{insert_task, key, i});
-//   }
-//   for (int i = 0; i < num_words; i++) {
-//     threads[i].join();
-//   }
-//   threads.clear();
+  auto insert_task = [&](const std::string &key, int value) {
+    bool success = trie.Insert(key, value);
+    EXPECT_EQ(success, true);
+  };
+  for (int i = 0; i < num_words; i++) {
+    std::string key = std::bitset<num_bits>(i).to_string();
+    threads.emplace_back(std::thread{insert_task, key, i});
+  }
+  for (int i = 0; i < num_words; i++) {
+    threads[i].join();
+  }
+  threads.clear();
 
-//   auto get_task = [&](const std::string &key, int value) {
-//     bool success = false;
-//     int tval = trie.GetValue<int>(key, &success);
-//     EXPECT_EQ(success, true);
-//     EXPECT_EQ(tval, value);
-//   };
-//   for (int i = 0; i < num_words; i++) {
-//     std::string key = std::bitset<num_bits>(i).to_string();
-//     threads.emplace_back(std::thread{get_task, key, i});
-//   }
-//   for (int i = 0; i < num_words; i++) {
-//     threads[i].join();
-//   }
-//   threads.clear();
-// }
+  auto get_task = [&](const std::string &key, int value) {
+    bool success = false;
+    int tval = trie.GetValue<int>(key, &success);
+    EXPECT_EQ(success, true);
+    EXPECT_EQ(tval, value);
+  };
+  for (int i = 0; i < num_words; i++) {
+    std::string key = std::bitset<num_bits>(i).to_string();
+    threads.emplace_back(std::thread{get_task, key, i});
+  }
+  for (int i = 0; i < num_words; i++) {
+    threads[i].join();
+  }
+  threads.clear();
+}
 
 }  // namespace bustub
