@@ -369,7 +369,7 @@ class Trie {
       return false;
     }
     root->RemoveChildNode(key[pos]);
-    return !(root->IsEndNode());
+    return !(root->HasChildren() || root->IsEndNode());
   }
 
   auto Remove(const std::string &key) -> bool {
@@ -381,7 +381,7 @@ class Trie {
     TrieNode *pre = nullptr;
     TrieNode *p = root_.get();
     for (const auto &c : key) {
-      if (p->HasChild(c) == false) {
+      if (!(p->HasChild(c))) {
         latch_.WUnlock();
         return false;
       }
@@ -391,6 +391,7 @@ class Trie {
     if (p->HasChildren()) {
       char c = key[key.size() - 1];
       std::unique_ptr<TrieNode> baseptr = std::move(*(pre->GetChildNode(c)));
+      baseptr->SetEndNode(false);
       pre->RemoveChildNode(c);
       pre->InsertChildNode(c, std::move(baseptr));
       latch_.WUnlock();
@@ -429,7 +430,7 @@ class Trie {
     }
     TrieNode *p = root_.get();
     for (const auto &c : key) {
-      if (p->HasChild(c) == false) {
+      if (!(p->HasChild(c))) {
         latch_.RUnlock();
         return T{};
       }
