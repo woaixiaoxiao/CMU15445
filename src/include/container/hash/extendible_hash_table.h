@@ -93,8 +93,8 @@ class ExtendibleHashTable : public HashTable<K, V> {
    * @param value The value to be inserted.
    */
 
-  void InsertImplemantation(const K &key, const V &value); 
-  
+  void InsertImplemantation(const K &key, const V &value);
+
   void Insert(const K &key, const V &value) override;
 
   /**
@@ -185,7 +185,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
    */
   auto RedistributeBucket(std::shared_ptr<Bucket> bucket) -> void;
 
-  auto RedistributeBucket(std::shared_ptr<Bucket> oldbucket,std::shared_ptr<Bucket> newbucket) -> void;
+  auto RedistributeBucket(std::shared_ptr<Bucket> oldbucket, std::shared_ptr<Bucket> newbucket) -> void;
 
   /*****************************************************************
    * Must acquire latch_ first before calling the below functions. *

@@ -53,6 +53,8 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   auto GetPages() -> Page * { return pages_; }
 
  protected:
+  // 置换一个页面回磁盘
+  auto SetPageGreen(frame_id_t curframe) -> void;
   /**
    * TODO(P1): Add implementation
    *

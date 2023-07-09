@@ -18,7 +18,6 @@
 #include <iterator>
 #include <list>
 #include <memory>
-#include <mutex>
 #include <utility>
 
 #include "container/hash/extendible_hash_table.h"
@@ -160,7 +159,7 @@ void ExtendibleHashTable<K, V>::InsertImplemantation(const K &key, const V &valu
     size_t index = IndexOf(key);
 
     // 如果目录索引的最低有效位与目标桶的局部深度相同，则将键值对移动到新桶中
-    size_t validpos=oldlocalmask+1;
+    size_t validpos = oldlocalmask + 1;
     if ((index & validpos) == validpos) {
       newbucket->Insert(key, value);
       it = items.erase(it);
@@ -169,9 +168,9 @@ void ExtendibleHashTable<K, V>::InsertImplemantation(const K &key, const V &valu
     }
   }
 
-  size_t start = (index & oldlocalmask) + (oldlocalmask+1);
+  size_t start = (index & oldlocalmask) + (oldlocalmask + 1);
 
-  for (size_t i = start; i < dir_.size(); i += (newlocalmask+1)) {
+  for (size_t i = start; i < dir_.size(); i += (newlocalmask + 1)) {
     dir_[i] = newbucket;
   }
 

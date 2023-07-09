@@ -12,9 +12,14 @@
 
 #pragma once
 
+#include <cstddef>
+#include <iostream>
 #include <limits>
 #include <list>
+#include <memory>
 #include <mutex>  // NOLINT
+#include <ostream>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -132,14 +137,70 @@ class LRUKReplacer {
    */
   auto Size() -> size_t;
 
+  class Frame {
+   public:
+    Frame(frame_id_t id, size_t k) {
+      id_ = id;
+      k_ = k;
+      is_evictable_ = false;
+    }
+    auto GetFrameId() -> frame_id_t { return id_; }
+    auto IsEvictable() -> bool { return is_evictable_; }
+    auto SetEvictable(bool is_evictable) -> void { is_evictable_ = is_evictable; }
+    auto OverKAccess() -> bool { return frame_timestamp_.size() == k_; }
+    auto InsertAccess(size_t timestamp) -> size_t {
+      frame_timestamp_.push_back(timestamp);
+      if (frame_timestamp_.size() > k_) {
+        frame_timestamp_.pop_front();
+      }
+      return frame_timestamp_.front();
+    }
+    auto GetPreK() -> size_t { return frame_timestamp_.front(); }
+
+   private:
+    frame_id_t id_;
+    bool is_evictable_;
+    std::list<size_t> frame_timestamp_;
+    size_t k_;
+  };
+
+  auto DeleteFrame(std::unordered_map<frame_id_t, std::list<std::unique_ptr<Frame>>::iterator> &map_,
+                   std::list<std::unique_ptr<Frame>> &list_, frame_id_t *frame_id) -> bool;
+
+  auto SetFrame(std::unordered_map<frame_id_t, std::list<std::unique_ptr<Frame>>::iterator> &map_, frame_id_t frame_id,
+                bool set_evictable) -> bool;
+  auto DeleteCertainFrame(std::unordered_map<frame_id_t, std::list<std::unique_ptr<Frame>>::iterator> &map_,
+                          std::list<std::unique_ptr<Frame>> &list_, frame_id_t frame_id) -> bool;
+  auto PrintFrameList() -> void {
+    std::cout << "**************************" << std::endl;
+    for (auto &a : lessklist_) {
+      std::cout << (*a).GetFrameId() << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "**************************" << std::endl;
+    for (auto &a : overklist_) {
+      std::cout << (*a).GetFrameId() << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "**************************" << std::endl;
+  }
+
+  auto PrintSize() -> void { std::cout << curr_size_ << std::endl; }
+
  private:
   // TODO(student): implement me! You can replace these member variables as you like.
   // Remove maybe_unused if you start using them.
-  [[maybe_unused]] size_t current_timestamp_{0};
-  [[maybe_unused]] size_t curr_size_{0};
-  [[maybe_unused]] size_t replacer_size_;
-  [[maybe_unused]] size_t k_;
+  size_t current_timestamp_{0};
+  size_t curr_size_{0};
+  size_t replacer_size_;
+  size_t k_;
   std::mutex latch_;
+
+  std::list<std::unique_ptr<Frame>> overklist_;
+  std::unordered_map<frame_id_t, std::list<std::unique_ptr<Frame>>::iterator> overkmap_;
+
+  std::list<std::unique_ptr<Frame>> lessklist_;
+  std::unordered_map<frame_id_t, std::list<std::unique_ptr<Frame>>::iterator> lesskmap_;
 };
 
 }  // namespace bustub
