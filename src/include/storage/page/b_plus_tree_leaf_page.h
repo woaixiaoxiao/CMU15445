@@ -49,10 +49,27 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto GetNextPageId() const -> page_id_t;
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
+  auto ValueAt(int index) const -> ValueType;
+
+  auto SearchKeyPos(const KeyType &key, KeyComparator &comparator) const -> int;
+
+  void SetKeyAt(int index, const KeyType &key) { array_[index].first = key; }
+  void SetValueAt(int index, const ValueType &value) { array_[index].second = value; }
+  // 将一对KV插入当前结点，如果已经有了重复的key，则return false，否则 return true
+  auto Insert(const KeyType &key, const ValueType &value, KeyComparator &comparator) -> bool;
+  void MoveLatterHalfTo(BPlusTreeLeafPage *new_leaf_node_ptr);
+  auto PairAt(int index) -> MappingType &;
+  auto SearchBigOrEqualPos(KeyType key, KeyComparator &comparator) -> int;
+  auto Remove(const KeyType &key, KeyComparator &comparator) -> bool;
+  void MoveFirstToEndof(BPlusTreeLeafPage* receive_ptr);
+  void MoveLastToFirstof(BPlusTreeLeafPage* receive_ptr);
+  void MoveBackOne();
+  void MoveAllTo(BPlusTreeLeafPage* receive_ptr);
 
  private:
   page_id_t next_page_id_;
   // Flexible array member for page data.
+  // 啥玩意
   MappingType array_[1];
 };
 }  // namespace bustub

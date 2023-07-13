@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "common/config.h"
 #include "concurrency/transaction.h"
 #include "storage/index/index_iterator.h"
 #include "storage/page/b_plus_tree_internal_page.h"
@@ -35,6 +36,7 @@ namespace bustub {
  */
 INDEX_TEMPLATE_ARGUMENTS
 class BPlusTree {
+  using BasicPage = BPlusTreePage;
   using InternalPage = BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>;
   using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
 
@@ -42,14 +44,74 @@ class BPlusTree {
   explicit BPlusTree(std::string name, BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator,
                      int leaf_max_size = LEAF_PAGE_SIZE, int internal_max_size = INTERNAL_PAGE_SIZE);
 
+  void PrintSize() { printf("%d %d\n", leaf_max_size_, internal_max_size_); }
+
   // Returns true if this B+ tree has no keys and values.
   auto IsEmpty() const -> bool;
+
+  // 创造一个叶子结点
+  auto CreateLeafNode() -> LeafPage *;
+
+  // 创造一个内部结点
+  auto CreateInternalNode() -> InternalPage *;
+
+  // 初始化一个B+树
+  void InitBPlusTree(const KeyType &key, const ValueType &value);
+
+  // 辅助Insert操作
+  auto InsertHelper(const KeyType &key, const ValueType &value) -> bool;
+
+  // 将新得到的内部结点的所有孩子的parent指向这个节点
+  void SetChildParentID(InternalPage *internal_page_ptr);
+
+  // 分裂操作，向父节点中插入一个key
+  void InsertInParent(BPlusTreePage *left_page, BPlusTreePage *right_page, KeyType &key);
 
   // Insert a key-value pair into this B+ tree.
   auto Insert(const KeyType &key, const ValueType &value, Transaction *transaction = nullptr) -> bool;
 
+  auto RemoveImplement(BasicPage *page_ptr, const KeyType &key) -> bool;
+
+  // 将该节点中的key删掉，并进行后续可能的重新分配，合并工作
+  void RemoveEntry(BasicPage *page_ptr, const KeyType &key);
+
+  // 辅助Remove操作
+  void RemoveHelper(const KeyType &key, Transaction *transaction = nullptr);
+
+  // 完成merge操作
+  void Merge(InternalPage *parent_page_ptr, BasicPage *base_page, BasicPage *brother_page, int index,
+             bool brother_on_left);
+
+  // 尝试去和兄弟结点合并，如果成功了，则返回true，否则false
+  auto TryMerge(BasicPage *page_ptr, const KeyType &key) -> bool;
+
+  // 将所有孩子的父节点置为自己
+  void ReFreshAllChildParent(InternalPage *base_ptr);
+
+  // 将当前页面的第index个孩子的parent置为自己
+  void ReFreshParent(InternalPage *base_ptr, int index);
+
+  // 从右兄弟借一个结点给自己
+  void Redistribute(InternalPage *parent_page_ptr, BasicPage *base_page, BasicPage *brother_page, int index,
+                    bool brother_on_left);
+
+  // 尝试去向兄弟结点借，如果成功了，则返回true，否则false
+  auto TryRedistribute(BasicPage *page_ptr, const KeyType &key) -> bool;
+
   // Remove a key and its value from this B+ tree.
   void Remove(const KeyType &key, Transaction *transaction = nullptr);
+
+  // 将基本的页面类型，强制转为对应的页面类型
+  auto ReInterpretAsInternalPage(BasicPage *basicpage) -> InternalPage * {
+    return reinterpret_cast<InternalPage *>(basicpage);
+  }
+  auto ReInterpretAsLeafPage(BasicPage *basicpage) -> LeafPage * { return reinterpret_cast<LeafPage *>(basicpage); }
+
+  // 根据页面id，从缓存池管理器中，取出B+树的结点（这个结点的载体是一个B+树类型的页面）
+  auto FetchBPlusTreePage(page_id_t page_id) -> BasicPage *;
+
+  // 寻找key对应的叶子结点所在
+  auto FindLeafPage(const KeyType &key) -> LeafPage *;
 
   // return the value associated with a given key
   auto GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction = nullptr) -> bool;
@@ -89,6 +151,8 @@ class BPlusTree {
   KeyComparator comparator_;
   int leaf_max_size_;
   int internal_max_size_;
+
+  bool no_root_{true};
 };
 
 }  // namespace bustub
