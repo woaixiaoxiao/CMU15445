@@ -331,7 +331,7 @@ INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::InsertHelper(const KeyType &key, const ValueType &value, Transaction *transaction, LatchMode mode)
     -> bool {
   // 留坑，就是不用height
-  // int dirty_height = 0;
+  // int dirty_height = 0
   LatchRootPageID(transaction, mode);
   // 如果当前的B+树为空
   if (IsEmpty()) {
