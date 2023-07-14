@@ -124,9 +124,11 @@ auto BPLUSTREE_TYPE::FindLeafPage(const KeyType &key, Transaction *transaction, 
         RealseAllLatches(transaction, mode);
       }
       transaction->AddIntoPageSet(raw_next_page_ptr);
+    } else {
+      buffer_pool_manager_->UnpinPage(cur_page_ptr->GetPageId(), false);
     }
     // 当前结点页面已经不需要了，记得记得unpin
-    buffer_pool_manager_->UnpinPage(cur_page_ptr->GetPageId(), false);
+    // buffer_pool_manager_->UnpinPage(cur_page_ptr->GetPageId(), false);
     raw_cur_page_ptr = raw_next_page_ptr;
     cur_page_ptr = next_page_ptr;
   }
@@ -181,6 +183,9 @@ void BPLUSTREE_TYPE::RealseAllLatches(Transaction *transaction, LatchMode mode, 
       } else {
         front_page->WUnlatch();
       }
+    }
+    if (front_page != nullptr) {
+      buffer_pool_manager_->UnpinPage(front_page->GetPageId(), page_set->size() <= static_cast<size_t>(dirty_height));
     }
   }
 }
@@ -301,7 +306,7 @@ void BPLUSTREE_TYPE::InsertInParent(BPlusTreePage *left_page, BPlusTreePage *rig
     left_page->SetParentPageId(root_page_id_);
     right_page->SetParentPageId(root_page_id_);
     // unpin这个父节点，返回
-    buffer_pool_manager_->UnpinPage(root_page_id_, true);
+    buffer_pool_manager_->UnpinPage(new_root_internal_node_ptr->GetPageId(), true);
     return;
   }
   // 如果left_page不是根节点，则取出父节点的ptr
@@ -332,33 +337,37 @@ auto BPLUSTREE_TYPE::InsertHelper(const KeyType &key, const ValueType &value, Tr
     -> bool {
   // 留坑，就是不用height
   // int dirty_height = 0
+  int dirty_height = 0;
   LatchRootPageID(transaction, mode);
   // 如果当前的B+树为空
   if (IsEmpty()) {
     if (mode == LatchMode::OPTIMIZE) {
-      RealseAllLatches(transaction, mode);
+      RealseAllLatches(transaction, mode, dirty_height);
       return InsertHelper(key, value, transaction, LatchMode::INSERT);
     }
     InitBPlusTree(key, value);
-    RealseAllLatches(transaction, mode);
+    RealseAllLatches(transaction, mode, dirty_height);
     return true;
   }
   // 如果当前的B+树不为空
   // 先找到这个key应该存在的叶节点
+  // printf("准备去找叶子结点\n");
   LeafPage *leaf_node_ptr = FindLeafPage(key, transaction, mode).second;
+  // printf("找到了叶子结点\n");
   if ((1 + leaf_node_ptr->GetSize() == leaf_node_ptr->GetMaxSize()) && mode == LatchMode::OPTIMIZE) {
-    buffer_pool_manager_->UnpinPage(leaf_node_ptr->GetPageId(), false);
-    RealseAllLatches(transaction, mode);
+    // buffer_pool_manager_->UnpinPage(leaf_node_ptr->GetPageId(), false);
+    RealseAllLatches(transaction, mode, dirty_height);
     return InsertHelper(key, value, transaction, LatchMode::INSERT);
   }
 
   // 插入之后，如果这个key已经重复了，则直接return false
   bool no_duplicate = leaf_node_ptr->Insert(key, value, comparator_);
   if (!no_duplicate) {
-    buffer_pool_manager_->UnpinPage(leaf_node_ptr->GetPageId(), false);
-    RealseAllLatches(transaction, mode);
+    // buffer_pool_manager_->UnpinPage(leaf_node_ptr->GetPageId(), false);
+    RealseAllLatches(transaction, mode, dirty_height);
     return false;
   }
+  dirty_height += 1;
   // 插入之后，如果已经满了，那就要进行分裂操作
   if (leaf_node_ptr->GetSize() == leaf_node_ptr->GetMaxSize()) {
     // 创建一个新的叶节点
@@ -371,8 +380,8 @@ auto BPLUSTREE_TYPE::InsertHelper(const KeyType &key, const ValueType &value, Tr
     // unpin新节点
     buffer_pool_manager_->UnpinPage(new_leaf_node_ptr->GetPageId(), true);
   }
-  buffer_pool_manager_->UnpinPage(leaf_node_ptr->GetPageId(), true);
-  RealseAllLatches(transaction, mode);
+  // buffer_pool_manager_->UnpinPage(leaf_node_ptr->GetPageId(), true);
+  RealseAllLatches(transaction, mode, dirty_height);
   return true;
 }
 
@@ -507,7 +516,7 @@ void BPLUSTREE_TYPE::ReFreshAllChildParent(InternalPage *base_ptr) {
 
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Merge(InternalPage *parent_page_ptr, BasicPage *base_page, BasicPage *brother_page, int index,
-                           bool brother_on_left) {
+                           bool brother_on_left,int &dirty_height) {
   // 如果当前节点是叶节点
   if (base_page->IsLeafPage()) {
     LeafPage *base_leaf_page = ReInterpretAsLeafPage(base_page);
@@ -518,7 +527,7 @@ void BPLUSTREE_TYPE::Merge(InternalPage *parent_page_ptr, BasicPage *base_page, 
       base_leaf_page->MoveAllTo(brother_leaf_page);
       brother_leaf_page->SetNextPageId(base_leaf_page->GetNextPageId());
       base_leaf_page->SetParentPageId(INVALID_PAGE_ID);
-      RemoveEntry(parent_page_ptr, need_remove_key);
+      RemoveEntry(parent_page_ptr, need_remove_key,dirty_height);
     } else {
       // 如果兄弟结点在右边
       // 先挪东西
@@ -528,7 +537,7 @@ void BPLUSTREE_TYPE::Merge(InternalPage *parent_page_ptr, BasicPage *base_page, 
       base_leaf_page->SetNextPageId(brother_leaf_page->GetNextPageId());
       brother_leaf_page->SetParentPageId(INVALID_PAGE_ID);
       // 在parent中删除brother对应的那个KV
-      RemoveEntry(parent_page_ptr, need_remove_key);
+      RemoveEntry(parent_page_ptr, need_remove_key,dirty_height);
     }
   } else {
     // 如果当前节点是内部节点
@@ -542,7 +551,7 @@ void BPLUSTREE_TYPE::Merge(InternalPage *parent_page_ptr, BasicPage *base_page, 
       ReFreshAllChildParent(brother_internal_page);
       brother_internal_page->SetKeyAt(old_size, need_remove_key);
       base_internal_page->SetParentPageId(INVALID_PAGE_ID);
-      RemoveEntry(parent_page_ptr, need_remove_key);
+      RemoveEntry(parent_page_ptr, need_remove_key,dirty_height);
     } else {
       // 如果兄弟结点在右边
       // 先挪东西
@@ -556,13 +565,13 @@ void BPLUSTREE_TYPE::Merge(InternalPage *parent_page_ptr, BasicPage *base_page, 
       // 将brother页面丢弃
       brother_internal_page->SetParentPageId(INVALID_PAGE_ID);
       // 移出父节点指向brother页面的KV
-      RemoveEntry(parent_page_ptr, need_remove_key);
+      RemoveEntry(parent_page_ptr, need_remove_key,dirty_height);
     }
   }
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::TryMerge(BasicPage *page_ptr, const KeyType &key) -> bool {
+auto BPLUSTREE_TYPE::TryMerge(BasicPage *page_ptr, const KeyType &key,int &dirty_height) -> bool {
   // 首先取出parent的id和ptr
   page_id_t parent_page_id = page_ptr->GetParentPageId();
   InternalPage *parent_page_ptr = ReInterpretAsInternalPage(FetchBPlusTreePage(parent_page_id).second);
@@ -572,7 +581,7 @@ auto BPLUSTREE_TYPE::TryMerge(BasicPage *page_ptr, const KeyType &key) -> bool {
   if (index < parent_page_ptr->GetSize() - 1) {
     page_id_t right_brother_id = parent_page_ptr->ValueAt(index + 1);
     BasicPage *right_brother_ptr = FetchBPlusTreePage(right_brother_id).second;
-    Merge(parent_page_ptr, page_ptr, right_brother_ptr, index, false);
+    Merge(parent_page_ptr, page_ptr, right_brother_ptr, index, false,dirty_height);
     buffer_pool_manager_->UnpinPage(parent_page_id, true);
     buffer_pool_manager_->UnpinPage(right_brother_id, true);
     return true;
@@ -581,7 +590,7 @@ auto BPLUSTREE_TYPE::TryMerge(BasicPage *page_ptr, const KeyType &key) -> bool {
   if (index > 0) {
     page_id_t left_brother_id = parent_page_ptr->ValueAt(index - 1);
     BasicPage *left_brother_ptr = FetchBPlusTreePage(left_brother_id).second;
-    Merge(parent_page_ptr, page_ptr, left_brother_ptr, index, true);
+    Merge(parent_page_ptr, page_ptr, left_brother_ptr, index, true,dirty_height);
     buffer_pool_manager_->UnpinPage(parent_page_id, true);
     buffer_pool_manager_->UnpinPage(left_brother_id, true);
     return true;
@@ -591,13 +600,14 @@ auto BPLUSTREE_TYPE::TryMerge(BasicPage *page_ptr, const KeyType &key) -> bool {
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::RemoveEntry(BasicPage *page_ptr, const KeyType &key) {
+void BPLUSTREE_TYPE::RemoveEntry(BasicPage *page_ptr, const KeyType &key,int &dirty_height) {
   // 留坑：这可能是一种偷懒的写法，因为并没有删除内部节点中与叶节点对应的结点，
   // 首先，尝试删除，如果删除成功，则返回true，否则false
   bool remove_success = RemoveImplement(page_ptr, key);
   if (!remove_success) {
     return;
   }
+  dirty_height++;
   // 如果删除之后，这个叶节点的没有到达最低临界值，则直接返回
   if (page_ptr->GetSize() >= page_ptr->GetMinSize()) {
     return;
@@ -635,7 +645,7 @@ void BPLUSTREE_TYPE::RemoveEntry(BasicPage *page_ptr, const KeyType &key) {
     // 如果借不到，那么尝试和兄弟去合并
     if (!try_distrubute) {
       // 如果执行了try_merge，那么肯定是要成功的
-      TryMerge(page_ptr, key);
+      TryMerge(page_ptr, key,dirty_height);
     }
   }
 }
@@ -643,11 +653,11 @@ void BPLUSTREE_TYPE::RemoveEntry(BasicPage *page_ptr, const KeyType &key) {
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::RemoveHelper(const KeyType &key, Transaction *transaction, LatchMode mode) {
   // 就是不用dirty_height
-  // int dirty_height = 0;
+  int dirty_height = 0;
   LatchRootPageID(transaction, mode);
   // 如果当前这棵树为空，则直接返回
   if (IsEmpty()) {
-    RealseAllLatches(transaction, mode);
+    RealseAllLatches(transaction, mode,dirty_height);
     return;
   }
   // 如果这棵树不空，则找到对应的叶节点，调用函数将其删除
@@ -665,8 +675,8 @@ void BPLUSTREE_TYPE::RemoveHelper(const KeyType &key, Transaction *transaction, 
       return RemoveHelper(key, transaction, LatchMode::DELETE);
     }
   }
-  RemoveEntry(leaf_page_ptr, key);
-  buffer_pool_manager_->UnpinPage(leaf_page_ptr->GetPageId(), true);
+  RemoveEntry(leaf_page_ptr, key,dirty_height);
+  // buffer_pool_manager_->UnpinPage(leaf_page_ptr->GetPageId(), true);
   RealseAllLatches(transaction, mode);
   // 留坑：大佬好像忘记unpin了
 }
