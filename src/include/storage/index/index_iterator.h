@@ -44,7 +44,7 @@ class IndexIterator {
 
   auto FetchLeafPtr(page_id_t next_page_id) -> B_PLUS_TREE_LEAF_PAGE_TYPE *;
 
-  void PrintPageId() { printf("%d %d\n", cur_page_id_,cur_leaf_ptr_->GetNextPageId()); }
+  void PrintPageId() { printf("%d %d\n", cur_page_id_, cur_leaf_ptr_->GetNextPageId()); }
 
  private:
   // add your own private member variables here

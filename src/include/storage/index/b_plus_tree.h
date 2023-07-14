@@ -12,6 +12,7 @@
 
 #include <queue>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "common/config.h"
@@ -19,6 +20,7 @@
 #include "storage/index/index_iterator.h"
 #include "storage/page/b_plus_tree_internal_page.h"
 #include "storage/page/b_plus_tree_leaf_page.h"
+#include "storage/page/page.h"
 
 namespace bustub {
 
@@ -41,6 +43,8 @@ class BPlusTree {
   using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
 
  public:
+  enum class LatchMode { READ, INSERT, DELETE, OPTIMIZE };
+
   explicit BPlusTree(std::string name, BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator,
                      int leaf_max_size = LEAF_PAGE_SIZE, int internal_max_size = INTERNAL_PAGE_SIZE);
 
@@ -59,7 +63,7 @@ class BPlusTree {
   void InitBPlusTree(const KeyType &key, const ValueType &value);
 
   // 辅助Insert操作
-  auto InsertHelper(const KeyType &key, const ValueType &value) -> bool;
+  auto InsertHelper(const KeyType &key, const ValueType &value, Transaction *transaction, LatchMode mode) -> bool;
 
   // 将新得到的内部结点的所有孩子的parent指向这个节点
   void SetChildParentID(InternalPage *internal_page_ptr);
@@ -76,7 +80,7 @@ class BPlusTree {
   void RemoveEntry(BasicPage *page_ptr, const KeyType &key);
 
   // 辅助Remove操作
-  void RemoveHelper(const KeyType &key, Transaction *transaction = nullptr);
+  void RemoveHelper(const KeyType &key, Transaction *transaction, LatchMode mode);
 
   // 完成merge操作
   void Merge(InternalPage *parent_page_ptr, BasicPage *base_page, BasicPage *brother_page, int index,
@@ -107,11 +111,14 @@ class BPlusTree {
   }
   auto ReInterpretAsLeafPage(BasicPage *basicpage) -> LeafPage * { return reinterpret_cast<LeafPage *>(basicpage); }
 
+  auto IsSafe(BasicPage *tree_page_ptr, LatchMode mode) -> bool;
+
   // 根据页面id，从缓存池管理器中，取出B+树的结点（这个结点的载体是一个B+树类型的页面）
-  auto FetchBPlusTreePage(page_id_t page_id) -> BasicPage *;
+  auto FetchBPlusTreePage(page_id_t page_id) -> std::pair<Page *, BasicPage *>;
 
   // 寻找key对应的叶子结点所在
-  auto FindLeafPage(const KeyType &key) -> LeafPage *;
+  auto FindLeafPage(const KeyType &key, Transaction *transaction = nullptr, LatchMode mode = LatchMode::READ)
+      -> std::pair<Page *, LeafPage *>;
 
   // return the value associated with a given key
   auto GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction = nullptr) -> bool;
@@ -123,6 +130,9 @@ class BPlusTree {
   auto Begin() -> INDEXITERATOR_TYPE;
   auto Begin(const KeyType &key) -> INDEXITERATOR_TYPE;
   auto End() -> INDEXITERATOR_TYPE;
+
+  void LatchRootPageID(Transaction *transaction, LatchMode mode);
+  void RealseAllLatches(Transaction *transaction, LatchMode mode, int dirty_height = 0);
 
   // print the B+ tree
   void Print(BufferPoolManager *bpm);
@@ -151,8 +161,8 @@ class BPlusTree {
   KeyComparator comparator_;
   int leaf_max_size_;
   int internal_max_size_;
-
   bool no_root_{true};
+  ReaderWriterLatch root_id_rwlatch_;
 };
 
 }  // namespace bustub

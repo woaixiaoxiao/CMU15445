@@ -50,9 +50,7 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
   auto ValueAt(int index) const -> ValueType;
-
   auto SearchKeyPos(const KeyType &key, KeyComparator &comparator) const -> int;
-
   void SetKeyAt(int index, const KeyType &key) { array_[index].first = key; }
   void SetValueAt(int index, const ValueType &value) { array_[index].second = value; }
   // 将一对KV插入当前结点，如果已经有了重复的key，则return false，否则 return true
@@ -61,10 +59,10 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto PairAt(int index) -> MappingType &;
   auto SearchBigOrEqualPos(KeyType key, KeyComparator &comparator) -> int;
   auto Remove(const KeyType &key, KeyComparator &comparator) -> bool;
-  void MoveFirstToEndof(BPlusTreeLeafPage* receive_ptr);
-  void MoveLastToFirstof(BPlusTreeLeafPage* receive_ptr);
+  void MoveFirstToEndof(BPlusTreeLeafPage *receive_ptr);
+  void MoveLastToFirstof(BPlusTreeLeafPage *receive_ptr);
   void MoveBackOne();
-  void MoveAllTo(BPlusTreeLeafPage* receive_ptr);
+  void MoveAllTo(BPlusTreeLeafPage *receive_ptr);
 
  private:
   page_id_t next_page_id_;

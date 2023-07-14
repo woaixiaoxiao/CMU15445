@@ -73,7 +73,7 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::SearchNextChildPageID(const KeyType &key, K
       end = mid - 1;
     }
   }
-  //如果没有小于等于key的，也就是说需要取index为0的孩子
+  // 如果没有小于等于key的，也就是说需要取index为0的孩子
   if (comparator(KeyAt(start), key) > 0) {
     return ValueAt(0);
   }
@@ -168,7 +168,7 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::SearchIndex(const KeyType &key, KeyComparat
       end = mid - 1;
     }
   }
-  //如果没有小于等于key的，也就是说需要取index为0的孩子
+  // 如果没有小于等于key的，也就是说需要取index为0的孩子
   if (comparator(KeyAt(start), key) > 0) {
     return 0;
   }
@@ -176,40 +176,38 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::SearchIndex(const KeyType &key, KeyComparat
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveFirstToEndof(BPlusTreeInternalPage* receive_ptr)
-{
-  int size=receive_ptr->GetSize();
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveFirstToEndof(BPlusTreeInternalPage *receive_ptr) {
+  int size = receive_ptr->GetSize();
   receive_ptr->SetKeyAt(size, KeyAt(0));
   receive_ptr->SetValueAt(size, ValueAt(0));
   receive_ptr->IncreaseSize(1);
-  std::copy(array_ +1, array_ + GetSize(), array_);
+  std::copy(array_ + 1, array_ + GetSize(), array_);
   DecreaseSize(1);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveBackOne(){
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveBackOne() {
   std::copy_backward(array_, array_ + GetSize(), array_ + GetSize() + 1);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveLastToFirstof(BPlusTreeInternalPage* receive_ptr)
-{
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveLastToFirstof(BPlusTreeInternalPage *receive_ptr) {
   // 首先把receive的所有值都往后一个位置
   receive_ptr->MoveBackOne();
   receive_ptr->IncreaseSize(1);
   // 然后将当前的最后一个放到receive的第一个
-  int size=GetSize();
-  receive_ptr->SetKeyAt(0, KeyAt(size-1));
-  receive_ptr->SetValueAt(0,ValueAt(size-1));
+  int size = GetSize();
+  receive_ptr->SetKeyAt(0, KeyAt(size - 1));
+  receive_ptr->SetValueAt(0, ValueAt(size - 1));
   // 最后更新size
   DecreaseSize(1);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(BPlusTreeInternalPage* receive_ptr){
-  int receive_size=receive_ptr->GetSize();
-  int size=GetSize();
-  std::copy(&array_[0],&array_[size],&receive_ptr->array_[receive_size]);
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(BPlusTreeInternalPage *receive_ptr) {
+  int receive_size = receive_ptr->GetSize();
+  int size = GetSize();
+  std::copy(&array_[0], &array_[size], &receive_ptr->array_[receive_size]);
   SetSize(0);
   receive_ptr->IncreaseSize(size);
 }

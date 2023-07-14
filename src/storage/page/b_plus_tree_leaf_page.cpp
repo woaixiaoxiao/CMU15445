@@ -107,8 +107,11 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &val
       left = mid + 1;
     }
   }
+  if (comparator(KeyAt(left), key) == 0) {
+    return false;
+  }
   // 如果没有比key大的，那么key紧接着放在最后面就行了
-  if (comparator(KeyAt(left), key) <= 0) {
+  if (comparator(KeyAt(left), key) < 0) {
     SetKeyAt(left + 1, key);
     SetValueAt(left + 1, value);
   } else {
@@ -210,7 +213,7 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveAllTo(BPlusTreeLeafPage *receive_ptr) {
   int receive_size = receive_ptr->GetSize();
   int send_size = GetSize();
-  std::copy(&array_[0],&array_[send_size],&receive_ptr->array_[receive_size]);
+  std::copy(&array_[0], &array_[send_size], &receive_ptr->array_[receive_size]);
   SetSize(0);
   receive_ptr->IncreaseSize(send_size);
 }

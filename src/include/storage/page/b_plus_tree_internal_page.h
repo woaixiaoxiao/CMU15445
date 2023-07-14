@@ -45,14 +45,16 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   void SetValueAt(int index, const ValueType &value) { array_[index].second = value; }
   auto SearchNextChildPageID(const KeyType &key, KeyComparator &comparator) const -> page_id_t;
   void Insert(const KeyType &key, page_id_t page_id, KeyComparator &comparator);
-  void MoveLatterHalfTo(BPlusTreeInternalPage* new_brother,const KeyType &key, page_id_t page_id, KeyComparator &comparator);
+  void MoveLatterHalfTo(BPlusTreeInternalPage *new_brother, const KeyType &key, page_id_t page_id,
+                        KeyComparator &comparator);
   auto Remove(const KeyType &key, KeyComparator &comparator) -> bool;
   auto SearchKeyPos(const KeyType &key, KeyComparator &comparator) const -> int;
   auto SearchIndex(const KeyType &key, KeyComparator &comparator) const -> int;
-  void MoveFirstToEndof(BPlusTreeInternalPage* receive_ptr);
-  void MoveLastToFirstof(BPlusTreeInternalPage* receive_ptr);
+  void MoveFirstToEndof(BPlusTreeInternalPage *receive_ptr);
+  void MoveLastToFirstof(BPlusTreeInternalPage *receive_ptr);
   void MoveBackOne();
-  void MoveAllTo(BPlusTreeInternalPage* receive_ptr);
+  void MoveAllTo(BPlusTreeInternalPage *receive_ptr);
+
  private:
   // Flexible array member for page data.
   // 留坑：什么时候给它分配空间？
