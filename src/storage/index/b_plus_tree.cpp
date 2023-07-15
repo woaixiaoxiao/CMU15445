@@ -673,7 +673,7 @@ void BPLUSTREE_TYPE::RemoveEntry(BasicPage *page_ptr, const KeyType &key, int &d
 
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::RemoveHelper(const KeyType &key, Transaction *transaction, LatchMode mode) {
-  // 就是不用dirty_height
+  // 就是不用dirty_height hehe
   int dirty_height = 0;
   LatchRootPageID(transaction, mode);
   // 如果当前这棵树为空，则直接返回
