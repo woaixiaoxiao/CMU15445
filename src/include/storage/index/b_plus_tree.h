@@ -49,7 +49,7 @@ class BPlusTree {
                      int leaf_max_size = LEAF_PAGE_SIZE, int internal_max_size = INTERNAL_PAGE_SIZE);
 
   void PrintSize() { printf("%d %d\n", leaf_max_size_, internal_max_size_); }
-
+  // hehe
   // Returns true if this B+ tree has no keys and values.
   auto IsEmpty() const -> bool;
 
@@ -77,17 +77,17 @@ class BPlusTree {
   auto RemoveImplement(BasicPage *page_ptr, const KeyType &key) -> bool;
 
   // 将该节点中的key删掉，并进行后续可能的重新分配，合并工作
-  void RemoveEntry(BasicPage *page_ptr, const KeyType &key,int &dirty_height);
+  void RemoveEntry(BasicPage *page_ptr, const KeyType &key, int &dirty_height);
 
   // 辅助Remove操作
   void RemoveHelper(const KeyType &key, Transaction *transaction, LatchMode mode);
 
   // 完成merge操作
   void Merge(InternalPage *parent_page_ptr, BasicPage *base_page, BasicPage *brother_page, int index,
-             bool brother_on_left,int &dirty_height);
+             bool brother_on_left, int &dirty_height);
 
   // 尝试去和兄弟结点合并，如果成功了，则返回true，否则false
-  auto TryMerge(BasicPage *page_ptr, const KeyType &key,int &dirty_height) -> bool;
+  auto TryMerge(BasicPage *page_ptr, const KeyType &key, int &dirty_height) -> bool;
 
   // 将所有孩子的父节点置为自己
   void ReFreshAllChildParent(InternalPage *base_ptr);

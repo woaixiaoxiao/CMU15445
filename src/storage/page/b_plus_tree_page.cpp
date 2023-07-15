@@ -40,6 +40,7 @@ void BPlusTreePage::SetMaxSize(int size) { max_size_ = size; }
  * Generally, min page size == max page size / 2
  */
 
+// hehe
 // 留坑，这里的注释疑似错误
 auto BPlusTreePage::GetMinSize() const -> int {
   if (IsLeafPage()) {

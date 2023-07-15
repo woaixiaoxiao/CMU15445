@@ -68,6 +68,7 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   page_id_t next_page_id_;
   // Flexible array member for page data.
   // 啥玩意
+  // hehe
   MappingType array_[1];
 };
 }  // namespace bustub

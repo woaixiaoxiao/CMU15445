@@ -168,6 +168,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::SearchBigOrEqualPos(KeyType key, KeyComparator 
   return -1;
 }
 
+// hehe
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::Remove(const KeyType &key, KeyComparator &comparator) -> bool {
   // 先查找当前叶节点是否有这个key，如果没有，直接return false

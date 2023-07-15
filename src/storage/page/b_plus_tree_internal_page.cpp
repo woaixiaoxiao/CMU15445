@@ -87,14 +87,21 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, page_id_t page_i
   int right = GetSize() - 1;
   while (left < right) {
     int mid = (left + right) >> 1;
-    if (comparator(KeyAt(mid), key) > 0) {
+    auto cmpres = comparator(KeyAt(mid), key);
+    if (cmpres == 0) {
+      return;
+    }
+    if (cmpres > 0) {
       right = mid;
     } else {
       left = mid + 1;
     }
   }
+  if (comparator(KeyAt(left), key) == 0) {
+    return;
+  }
   // 如果没有比这个key大的，那么直接放在后面
-  if (comparator(KeyAt(left), key) <= 0) {
+  if (comparator(KeyAt(left), key) < 0) {
     SetKeyAt(left + 1, key);
     SetValueAt(left + 1, page_id);
   } else {
@@ -155,6 +162,7 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Remove(const KeyType &key, KeyComparator &c
   return true;
 }
 
+// hehe
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::SearchIndex(const KeyType &key, KeyComparator &comparator) const -> int {
   size_t start = 1;

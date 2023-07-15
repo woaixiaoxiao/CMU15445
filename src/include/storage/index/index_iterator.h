@@ -49,6 +49,7 @@ class IndexIterator {
  private:
   // add your own private member variables here
   // 代表位置的leaf_page_ptr和index
+  // hehe
   B_PLUS_TREE_LEAF_PAGE_TYPE *cur_leaf_ptr_;
   int index_;
   page_id_t cur_page_id_;

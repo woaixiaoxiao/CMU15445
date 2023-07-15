@@ -7,6 +7,7 @@
 #include "storage/index/index_iterator.h"
 #include "storage/page/b_plus_tree_page.h"
 #include "storage/page/page.h"
+#include "type/numeric_type.h"
 
 namespace bustub {
 
@@ -30,7 +31,9 @@ INDEXITERATOR_TYPE::IndexIterator() = default;
 INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE::~IndexIterator() {
   // 当前迭代器失效的时候，那么要把这个迭代器代表的页面给unpin掉
-  buffer_pool_manager_->UnpinPage(cur_page_id_, false);
+  if (cur_page_id_ != INVALID_PAGE_ID) {
+    buffer_pool_manager_->UnpinPage(cur_page_id_, false);
+  }
 }  // NOLINT
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -41,6 +44,9 @@ auto INDEXITERATOR_TYPE::operator*() -> const MappingType & { return cur_leaf_pt
 
 INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::FetchLeafPtr(page_id_t next_page_id) -> B_PLUS_TREE_LEAF_PAGE_TYPE * {
+  if (next_page_id == INVALID_PAGE_ID) {
+    return nullptr;
+  }
   Page *page_ptr = buffer_pool_manager_->FetchPage(next_page_id);
   auto tree_page = reinterpret_cast<BPlusTreePage *>(page_ptr->GetData());
   return reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(tree_page);
