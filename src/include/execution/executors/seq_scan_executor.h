@@ -12,11 +12,16 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
 #include <vector>
 
+#include "catalog/column.h"
+#include "concurrency/transaction.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/seq_scan_plan.h"
+#include "storage/table/table_iterator.h"
 #include "storage/table/tuple.h"
 
 namespace bustub {
@@ -50,5 +55,19 @@ class SeqScanExecutor : public AbstractExecutor {
  private:
   /** The sequential scan plan node to be executed */
   const SeqScanPlanNode *plan_;
+  // 表的名字
+  std::string table_name_{};
+  // 这个表的末尾
+  TableIterator end_;
+  // 遍历这个表的指针
+  TableIterator cursor_;
+  // 筛选的谓词
+  std::shared_ptr<AbstractExpression> fileter_predicate_;
+  // 是否有锁
+  // bool obstain_lock_{false};
+  // 本次查询的事务
+  Transaction *tsn_;
+  // 表id
+  table_oid_t cur_table_id_;
 };
 }  // namespace bustub
