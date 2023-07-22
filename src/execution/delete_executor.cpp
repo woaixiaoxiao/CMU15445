@@ -40,6 +40,14 @@ auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   }
   // 提前取出事务
   Transaction *txn = exec_ctx_->GetTransaction();
+  if (!txn->IsTableIntentionExclusiveLocked(plan_->table_oid_)) {
+    bool succ =
+        exec_ctx_->GetLockManager()->LockTable(txn, LockManager::LockMode::INTENTION_EXCLUSIVE, plan_->table_oid_);
+    if (!succ) {
+      txn->SetState(TransactionState::ABORTED);
+      throw bustub::Exception(ExceptionType::EXECUTION, "InsertExecutor cannot get IX lock on table");
+    }
+  }
   // 提前记录下当前这个表的指针，方便
   std::string table_name = exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_)->name_;
   TableHeap *table_ptr = exec_ctx_->GetCatalog()->GetTable(table_name)->table_.get();
@@ -55,6 +63,11 @@ auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     bool fetch_success = child_executor_->Next(&child_tuple, rid);
     if (!fetch_success) {
       break;
+    }
+    // 获取删除的权限
+    if (!txn->IsRowExclusiveLocked(plan_->TableOid(), child_tuple.GetRid())) {
+      exec_ctx_->GetLockManager()->LockRow(txn, LockManager::LockMode::EXCLUSIVE, plan_->TableOid(),
+                                           child_tuple.GetRid());
     }
     // 尝试去删除
     bool delete_success = table_ptr->MarkDelete(child_tuple.GetRid(), txn);

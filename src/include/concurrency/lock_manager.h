@@ -14,9 +14,12 @@
 
 #include <algorithm>
 #include <condition_variable>  // NOLINT
+#include <deque>
 #include <list>
+#include <map>
 #include <memory>
 #include <mutex>  // NOLINT
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -27,6 +30,9 @@
 #include "concurrency/transaction.h"
 
 namespace bustub {
+
+using std::cout;
+using std::endl;
 
 class TransactionManager;
 
@@ -45,9 +51,9 @@ class LockManager {
   class LockRequest {
    public:
     LockRequest(txn_id_t txn_id, LockMode lock_mode, table_oid_t oid) /** Table lock request */
-        : txn_id_(txn_id), lock_mode_(lock_mode), oid_(oid) {}
+        : txn_id_(txn_id), lock_mode_(lock_mode), oid_(oid), is_table_(true) {}
     LockRequest(txn_id_t txn_id, LockMode lock_mode, table_oid_t oid, RID rid) /** Row lock request */
-        : txn_id_(txn_id), lock_mode_(lock_mode), oid_(oid), rid_(rid) {}
+        : txn_id_(txn_id), lock_mode_(lock_mode), oid_(oid), rid_(rid), is_table_(false) {}
 
     /** Txn_id of the txn requesting the lock */
     txn_id_t txn_id_;
@@ -57,14 +63,52 @@ class LockManager {
     table_oid_t oid_;
     /** Rid of the row for a row lock; unused for table locks */
     RID rid_;
+    // 对表的还是对行的
+    bool is_table_;
     /** Whether the lock has been granted or not */
     bool granted_{false};
   };
 
   class LockRequestQueue {
    public:
+    void InsertIntoQueue(std::shared_ptr<LockRequest> &request, bool is_upgrade) {
+      // 如果不是更新的
+      if (!is_upgrade) {
+        request_queue_.push_back(request);
+        return;
+      }
+      // 如果是更新的，那么需要找到未授权的第一个位置，再插入
+      auto find_lambda = [](std::shared_ptr<LockRequest> &req) { return req->granted_; };
+      auto it = std::find_if_not(request_queue_.begin(), request_queue_.end(), find_lambda);
+      request_queue_.insert(it, request);
+    }
+    auto IsSLock(LockMode lock_mode) { return lock_mode == LockMode::SHARED; }
+    auto IsXLock(LockMode lock_mode) { return lock_mode == LockMode::EXCLUSIVE; }
+    auto IsISLock(LockMode lock_mode) { return lock_mode == LockMode::INTENTION_SHARED; }
+    auto IsIXLock(LockMode lock_mode) { return lock_mode == LockMode::INTENTION_EXCLUSIVE; }
+    auto IsSIXLock(LockMode lock_mode) { return lock_mode == LockMode::SHARED_INTENTION_EXCLUSIVE; }
+
+    auto LockModeOk(LockMode a, LockMode b) -> bool {
+      bool suc1 = (IsSLock(a)) && (IsSLock(b) || IsISLock(b));
+      bool suc2 = (IsISLock(a)) && (IsSLock(b) || IsISLock(b) || IsIXLock(b) || IsSIXLock(b));
+      bool suc3 = (IsIXLock(a)) && (IsISLock(b) || IsIXLock(b));
+      bool suc4 = (IsSIXLock(a)) && (IsISLock(b));
+
+      return suc1 || suc2 || suc3 || suc4;
+    }
+
+    auto IsAllCompatible(std::list<std::shared_ptr<LockRequest>>::iterator new_lock_it) -> bool {
+      auto new_lock_mode = (*new_lock_it)->lock_mode_;
+      for (auto it = request_queue_.begin(); it != new_lock_it; it++) {
+        auto old_lock_mode = (*it)->lock_mode_;
+        if (!LockModeOk(old_lock_mode, new_lock_mode)) {
+          return false;
+        }
+      }
+      return true;
+    }
     /** List of lock requests for the same resource (table or row) */
-    std::list<LockRequest *> request_queue_;
+    std::list<std::shared_ptr<LockRequest>> request_queue_;
     /** For notifying blocked transactions on this rid */
     std::condition_variable cv_;
     /** txn_id of an upgrading transaction (if any) */
@@ -217,6 +261,39 @@ class LockManager {
    * @param oid the table_oid_t of the table to be locked in lock_mode
    * @return true if the upgrade is successful, false otherwise
    */
+
+  auto GetTableQueue(table_oid_t table_oid) -> std::shared_ptr<LockRequestQueue> {
+    // 给维护表的映射关系的map加锁
+    std::lock_guard<std::mutex> lock(table_lock_map_latch_);
+    // 若map里没有，则插入
+    if (table_lock_map_.find(table_oid) == table_lock_map_.end()) {
+      table_lock_map_.insert(std::make_pair(table_oid, std::make_shared<LockRequestQueue>()));
+    }
+    // 返回这个表对应的map
+    return table_lock_map_[table_oid];
+  }
+
+  auto GetRowQueue(RID rid) -> std::shared_ptr<LockRequestQueue> {
+    std::lock_guard<std::mutex> lock(row_lock_map_latch_);
+    if (row_lock_map_.find(rid) == row_lock_map_.end()) {
+      row_lock_map_.insert(std::make_pair(rid, std::make_shared<LockRequestQueue>()));
+    }
+    return row_lock_map_[rid];
+  }
+
+  auto IsSLock(LockMode lock_mode) { return lock_mode == LockMode::SHARED; }
+  auto IsXLock(LockMode lock_mode) { return lock_mode == LockMode::EXCLUSIVE; }
+  auto IsISLock(LockMode lock_mode) { return lock_mode == LockMode::INTENTION_SHARED; }
+  auto IsIXLock(LockMode lock_mode) { return lock_mode == LockMode::INTENTION_EXCLUSIVE; }
+  auto IsSIXLock(LockMode lock_mode) { return lock_mode == LockMode::SHARED_INTENTION_EXCLUSIVE; }
+
+  auto IsLockRequestValid(Transaction *txn, LockMode lock_mode, bool is_table, const table_oid_t &oid,
+                          LockMode &pre_lock_mode, bool &is_upgrade, const RID &rid,
+                          std::shared_ptr<LockRequestQueue> &queue, AbortReason &reason) -> bool;
+
+  auto CouldLockRequestProceed(std::shared_ptr<LockRequest> &request, Transaction *txn,
+                               std::shared_ptr<LockRequestQueue> &queue, bool &is_upgrade, bool &is_abort) -> bool;
+
   auto LockTable(Transaction *txn, LockMode lock_mode, const table_oid_t &oid) noexcept(false) -> bool;
 
   /**
@@ -230,6 +307,10 @@ class LockManager {
    * @param oid the table_oid_t of the table to be unlocked
    * @return true if the unlock is successful, false otherwise
    */
+  auto IsUnLockRequestValid(Transaction *txn, LockMode &lock_mode, bool is_table, const table_oid_t &oid,
+                            const RID &rid, std::shared_ptr<LockRequestQueue> &queue, AbortReason &reason) -> bool;
+  auto UnlockTableHelper(Transaction *txn, const table_oid_t &oid, bool is_upgrade) -> bool;
+  void TryUpdateTxnState(Transaction *txn, LockMode unlock_mode);
   auto UnlockTable(Transaction *txn, const table_oid_t &oid) -> bool;
 
   /**
@@ -262,6 +343,7 @@ class LockManager {
    * @param rid the RID of the row to be unlocked
    * @return true if the unlock is successful, false otherwise
    */
+  auto UnlockRowHelper(Transaction *txn, const table_oid_t &oid, const RID &rid, bool is_upgrade) -> bool;
   auto UnlockRow(Transaction *txn, const table_oid_t &oid, const RID &rid) -> bool;
 
   /*** Graph API ***/
@@ -285,6 +367,28 @@ class LockManager {
    * @param[out] txn_id if the graph has a cycle, will contain the newest transaction ID
    * @return false if the graph has no cycle, otherwise stores the newest transaction ID in the cycle to txn_id
    */
+  auto DepthFirstSearchToFindCycle(txn_id_t cur, std::set<txn_id_t> &visited, std::deque<txn_id_t> &path) -> txn_id_t {
+    // 记录当前节点
+    visited.emplace(cur);
+    path.emplace_back(cur);
+    // 开始尝试去搜索
+    for (auto &next_txn : waits_for_[cur]) {
+      // 如果下一个没有被访问过
+      if (visited.find(next_txn) == visited.end()) {
+        auto next_res = DepthFirstSearchToFindCycle(next_txn, visited, path);
+        // 如果在下一个那里发现了环
+        if (next_res != -1) {
+          return next_res;
+        }
+      }
+      // 如果下一个就在path里面，即当前就是一个环
+      if (std::find(path.begin(), path.end(), next_txn) != path.end()) {
+        return next_txn;
+      }
+    }
+    path.pop_back();
+    return -1;
+  }
   auto HasCycle(txn_id_t *txn_id) -> bool;
 
   /**
@@ -295,6 +399,46 @@ class LockManager {
   /**
    * Runs cycle detection in the background.
    */
+  void NotifyAllTxn() {
+    for (auto &[oid, queue] : table_lock_map_) {
+      queue->cv_.notify_all();
+    }
+    for (auto &[rid, queue] : row_lock_map_) {
+      queue->cv_.notify_all();
+    }
+  }
+  void TrimGraph(txn_id_t &id) {
+    waits_for_.erase(id);
+    for (auto &[start, end_point] : waits_for_) {
+      end_point.erase(id);
+    }
+  }
+  void MakeGraph() {
+    for (auto &[oid, queue] : table_lock_map_) {
+      std::set<txn_id_t> txn_has_lock;
+      for (auto &req : queue->request_queue_) {
+        if (req->granted_) {
+          txn_has_lock.emplace(req->txn_id_);
+        } else {
+          for (auto &ne : txn_has_lock) {
+            AddEdge(req->txn_id_, ne);
+          }
+        }
+      }
+    }
+    for (auto &[rid, queue] : row_lock_map_) {
+      std::set<txn_id_t> txn_has_lock;
+      for (auto &req : queue->request_queue_) {
+        if (req->granted_) {
+          txn_has_lock.emplace(req->txn_id_);
+        } else {
+          for (auto &ne : txn_has_lock) {
+            AddEdge(req->txn_id_, ne);
+          }
+        }
+      }
+    }
+  }
   auto RunCycleDetection() -> void;
 
  private:
@@ -312,8 +456,10 @@ class LockManager {
   std::atomic<bool> enable_cycle_detection_;
   std::thread *cycle_detection_thread_;
   /** Waits-for graph representation. */
-  std::unordered_map<txn_id_t, std::vector<txn_id_t>> waits_for_;
+  std::map<txn_id_t, std::set<txn_id_t>> waits_for_;
   std::mutex waits_for_latch_;
+
+  //
 };
 
 }  // namespace bustub

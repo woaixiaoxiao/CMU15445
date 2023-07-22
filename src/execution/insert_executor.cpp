@@ -16,6 +16,7 @@
 
 #include "catalog/column.h"
 #include "catalog/schema.h"
+#include "common/exception.h"
 #include "common/rid.h"
 #include "concurrency/transaction.h"
 #include "execution/executors/insert_executor.h"
@@ -42,6 +43,15 @@ auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     return false;
   }
   Transaction *transaction = exec_ctx_->GetTransaction();
+  // 如果现在对这个表没有IX权限，那么先去试着获取权限，如果失败，终止事务，抛出异常
+  if (!transaction->IsTableIntentionExclusiveLocked(plan_->table_oid_)) {
+    bool succ = exec_ctx_->GetLockManager()->LockTable(transaction, LockManager::LockMode::INTENTION_EXCLUSIVE,
+                                                       plan_->table_oid_);
+    if (!succ) {
+      transaction->SetState(TransactionState::ABORTED);
+      throw bustub::Exception(ExceptionType::EXECUTION, "InsertExecutor cannot get IX lock on table");
+    }
+  }
   // 创建一个tuple对象，用于从child算子接受tuple
   Tuple child_tuple{};
   // 创建一个count，记录插入了多少条数据
@@ -65,6 +75,8 @@ auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     if (insert_res) {
       count++;
     }
+    exec_ctx_->GetLockManager()->LockRow(transaction, LockManager::LockMode::EXCLUSIVE, plan_->table_oid_,
+                                         new_insert_rid);
     // 更新这个表的所有索引
     for (const auto &it : table_index) {
       // 取出这个索引的模式和属性

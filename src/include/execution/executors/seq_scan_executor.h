@@ -69,5 +69,6 @@ class SeqScanExecutor : public AbstractExecutor {
   Transaction *tsn_;
   // 表id
   table_oid_t cur_table_id_;
+  // bool obtain_lock_{false};
 };
 }  // namespace bustub
