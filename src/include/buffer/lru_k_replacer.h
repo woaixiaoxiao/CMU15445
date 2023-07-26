@@ -36,64 +36,16 @@
 
 namespace bustub {
 
-/** since time is in uint64_t, use uint64_max to represent infinity */
-#define ACCESSTIME_INFINITY UINT64_MAX
-
-/**
- * LRUKFrameRecord implements a frame's access statistics in the LRUKReplacer
- */
+// 存储一个页框相关的各种信息
 class LRUKFrameRecord {
  public:
-  /**
-   * @brief a new LRUKFrameRecord
-   * @param frame_id the frame id it corresponds to
-   * @param k the last k access time to be kept
-   */
-  explicit LRUKFrameRecord(size_t frame_id, size_t k);
-
-  DISALLOW_COPY_AND_MOVE(LRUKFrameRecord);
-
-  /**
-   * @brief check if this frame is allowed to be evicted
-   * @return true if it's OK to evict, or false if currently pinned
-   */
+  LRUKFrameRecord(size_t frame_id, size_t k);
   auto IsEvictable() const -> bool;
-
-  /**
-   * @brief Set the bool flag for this frame if it's evictable or not
-   * @param is_evictable flag
-   */
   auto SetEvictable(bool is_evictable) -> void;
-
-  /**
-   * @brief Access this page and update the queue of k access time history
-   * @param time the access time
-   */
   auto Access(uint64_t time) -> void;
-
-  /**
-   * @brief Get the k-th last access time, or Infinity if not enough access time so far
-   * @return k-th last access time or infinity
-   */
   auto LastKAccessTime() const -> uint64_t;
-
-  /**
-   * @brief Get the EarliestAccessTime access time, regardless of whether there is enough k access time
-   * @precondition this record must not have been accessed more than k times
-   * @return the earliest timestamp
-   */
   auto EarliestAccessTime() const -> uint64_t;
-
-  /**
-   * @brief Get the frame id for this frame record
-   * @return the id
-   */
   auto GetFrameId() const -> size_t;
-
-  /**
-   * @brief Get the size of access record queue
-   * @return size of access record queue
-   */
   auto AccessSize() const -> size_t;
 
  private:
@@ -103,16 +55,16 @@ class LRUKFrameRecord {
   std::queue<uint64_t> access_records_;
 };
 
+// 定义了访问次数小于k的情况下的set的比较规则
 struct PrematureFrameComp {
   auto operator()(const LRUKFrameRecord *lhs, const LRUKFrameRecord *rhs) const -> bool {
-    // compare two premature frame, only depends on their first entry time
     return lhs->EarliestAccessTime() < rhs->EarliestAccessTime();
   }
 };
 
+// 定义了访问次数大于等于k的情况下的set的比较规则
 struct MatureFrameComp {
   auto operator()(const LRUKFrameRecord *lhs, const LRUKFrameRecord *rhs) const -> bool {
-    // compare two mature frame, only depends on their last k access timestamp
     return lhs->LastKAccessTime() < rhs->LastKAccessTime();
   }
 };
@@ -138,11 +90,7 @@ class LRUKReplacer {
    */
   explicit LRUKReplacer(size_t num_frames, size_t k);
 
-  DISALLOW_COPY_AND_MOVE(LRUKReplacer);
-
-  /**
-   * @brief Destroys the LRUReplacer. Free all the frames dynamically allocated on heap
-   */
+  // 防止内存泄漏
   ~LRUKReplacer() {
     for (auto &frame : frames_) {
       delete frame;
@@ -217,42 +165,24 @@ class LRUKReplacer {
    */
   auto Size() -> size_t;
 
-  /**
-   * @brief Return the current timestamp
-   * @precondition need to be protected by mutex
-   * @return current timestamp
-   */
+  // 返回当前的时间戳，并给它加1
   auto CurrTime() -> uint64_t { return curr_time_++; }
 
- private:
-  /**
-   * @brief allocate a new frame at index and increase the size
-   * @param frame_id the index to be allocated
-   */
+  // 给这个页框分配一个lrurecored类，并更新大小
   auto AllocateFrameRecord(size_t frame_id) -> void;
 
-  /**
-   * @brief remove a frame by id and reduce the size
-   * @param frame_id the index to be deallocated
-   * @param is_premature if this iterator belongs to premature set or mature set
-   */
+  // 在set中删除，delete这个页框，最后更新大小
   auto DeallocateFrameRecord(size_t frame_id, bool is_premature) -> void;
-
-  /**
-   * @brief remove a frame by iterator and reduce the size
-   * @param frame_id the index to be deallocated
-   * @param is_premature if this iterator belongs to premature set or mature set
-   */
   auto DeallocateFrameRecord(container_iterator it, bool is_premature) -> void;
 
-  uint64_t curr_time_{0};    // curr timestamp
-  size_t curr_size_{0};      // how many frames in the replacer
-  size_t replacer_size_{0};  // how many evictable frames in the replacer
-  size_t k_;                 // the k as in LRU-K
+  uint64_t curr_time_{0};
+  size_t curr_size_{0};
+  size_t replacer_size_{0};
+  size_t k_;
   std::mutex latch_;
+  // 页框号->页框的统计信息类
   std::vector<LRUKFrameRecord *> frames_;
-  // two special data structures containing all evictable frames in sorted order
-  // by custom comparator
+  // 记录可淘汰的页框，分别是访问次数小于k和大于等于k的
   std::set<LRUKFrameRecord *, PrematureFrameComp> lru_premature_;
   std::set<LRUKFrameRecord *, MatureFrameComp> lru_mature_;
 };

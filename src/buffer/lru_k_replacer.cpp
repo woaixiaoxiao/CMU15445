@@ -43,47 +43,49 @@ auto LRUKFrameRecord::AccessSize() const -> size_t { return access_records_.size
 // ----------------------------------------------- //
 
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : k_(k) {
-  // fixed size of frames, initially all set to be null frame
+  // 初始化frames_的大小为frame的数量
   frames_.resize(num_frames, nullptr);
 }
 
 auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
-  // whenever there is evictable frame with less than k access, they get evicted first
   std::scoped_lock<std::mutex> lock(latch_);
+  // 如果没有可以淘汰的
   if (lru_mature_.empty() && lru_premature_.empty()) {
     return false;
   }
+  // 优先淘汰不足k次的，如果没有，那就淘汰k次的
   auto has_premature = !lru_premature_.empty();
   auto first_iter = has_premature ? lru_premature_.begin() : lru_mature_.begin();
   *frame_id = (*first_iter)->GetFrameId();
+  // 在set中删除这个页框
   DeallocateFrameRecord(first_iter, has_premature);
   return true;
 }
 
 void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
   std::scoped_lock<std::mutex> lock(latch_);
+  // 如果这个页框还没有分配
   if (frames_[frame_id] == nullptr) {
     AllocateFrameRecord(frame_id);
   }
-  // careful here that, if you made change to frame
-  // the set might contain duplicate, because "old version" and "new version" deemed different
-  // therefore, first remove, make changes, and then add it back
+  // 可能需要修改这个页框所在的set，或者需要修改这个页框在set中的顺序，所以在需要的情况下删除
+  // 这个页框的访问数量是否小于k
   auto is_premature = frames_[frame_id]->AccessSize() < k_;
+  // 这个页框是否可以被淘汰，即这个页框是否存在于某个set中
   auto is_evictable = frames_[frame_id]->IsEvictable();
   if (is_evictable && is_premature && frames_[frame_id]->AccessSize() == (k_ - 1)) {
-    // about to move from premature to mature
     lru_premature_.erase(frames_[frame_id]);
   }
   if (is_evictable && (!is_premature)) {
     lru_mature_.erase(frames_[frame_id]);
   }
-
+  // 更新访问信息
   frames_[frame_id]->Access(CurrTime());
-
+  // 如果之前在小于k的set中，并且再访问一次刚好进入等于k的set中，则插入
   if (is_evictable && is_premature && frames_[frame_id]->AccessSize() == k_) {
-    // move from premature to mature
     lru_mature_.insert(frames_[frame_id]);
   }
+  // 可能出现调整顺序的情况
   if (is_evictable && (!is_premature)) {
     lru_mature_.insert(frames_[frame_id]);
   }
@@ -91,13 +93,13 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   std::scoped_lock<std::mutex> lock(latch_);
+  // 首先判断这个页框是否在被使用
   if (frames_[frame_id] == nullptr) {
-    // no page allocated for this
     return;
   }
+  // 只有当前状态和要设置的状态不同时，才需要设置
   auto is_premature = frames_[frame_id]->AccessSize() < k_;
   if (set_evictable && !frames_[frame_id]->IsEvictable()) {
-    // transit from not evictable to evictable
     replacer_size_++;
     if (is_premature) {
       lru_premature_.insert(frames_[frame_id]);
@@ -106,7 +108,6 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
     }
   }
   if (!set_evictable && frames_[frame_id]->IsEvictable()) {
-    // transit from evictable to non evictable
     replacer_size_--;
     if (is_premature) {
       lru_premature_.erase(frames_[frame_id]);
@@ -114,15 +115,17 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
       lru_mature_.erase(frames_[frame_id]);
     }
   }
+  // 更新对应的frame中的状态
   frames_[frame_id]->SetEvictable(set_evictable);
 }
 
 void LRUKReplacer::Remove(frame_id_t frame_id) {
   std::scoped_lock<std::mutex> lock(latch_);
+  // 如果没有这个页框，直接return
   if (frames_[frame_id] == nullptr) {
-    // not found, directly return
     return;
   }
+  // 如果有这个页框，则将这个页框从set中删除，并且delete掉，最后更新size
   DeallocateFrameRecord(frame_id, frames_[frame_id]->AccessSize() < k_);
 }
 
