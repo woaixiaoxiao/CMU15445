@@ -10,15 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/**
- * Version3: Optimization attempt
- * Use two separate priority for pre-mature and mature frames management
- * For frame less than k access, their priority will not change even if we access them
- * When a frame reach k access, remove from the pre-mature queue and add to mature queue
- * For frame with enough k access, they need to be removed and re-insert into queue after access update
- * And we switch to restore raw pointer instead of std::shared_ptr for performance enhancement
- */
-
 #pragma once
 
 #include <cstdint>
