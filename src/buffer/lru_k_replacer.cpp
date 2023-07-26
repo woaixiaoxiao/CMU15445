@@ -14,8 +14,6 @@
 
 namespace bustub {
 
-// ------------- LRUKFrameRecord ----------------- //
-// ----------------------------------------------- //
 LRUKFrameRecord::LRUKFrameRecord(size_t frame_id, size_t k) : frame_id_(frame_id), k_(k) {}
 
 auto LRUKFrameRecord::IsEvictable() const -> bool { return is_evictable_; }
@@ -23,8 +21,6 @@ auto LRUKFrameRecord::IsEvictable() const -> bool { return is_evictable_; }
 auto LRUKFrameRecord::SetEvictable(bool is_evictable) -> void { is_evictable_ = is_evictable; }
 
 auto LRUKFrameRecord::Access(uint64_t time) -> void {
-  // only maintain last k access time
-  // by first-in-first-out queue
   while (access_records_.size() >= k_) {
     access_records_.pop();
   }
@@ -38,9 +34,6 @@ auto LRUKFrameRecord::EarliestAccessTime() const -> uint64_t { return access_rec
 auto LRUKFrameRecord::GetFrameId() const -> size_t { return frame_id_; }
 
 auto LRUKFrameRecord::AccessSize() const -> size_t { return access_records_.size(); }
-
-// ---------------- LRUKReplacer ----------------- //
-// ----------------------------------------------- //
 
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : k_(k) {
   // 初始化frames_的大小为frame的数量
