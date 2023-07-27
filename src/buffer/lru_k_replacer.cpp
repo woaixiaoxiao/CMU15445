@@ -66,7 +66,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
 
 void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
   std::scoped_lock<std::mutex> lock(latch_);
-  // 如果这个页框还没有分配
+  // 如果这个页框还没有分配的话
   if (frames_[frame_id] == nullptr) {
     AllocateFrameRecord(frame_id);
   }

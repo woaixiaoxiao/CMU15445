@@ -162,10 +162,6 @@ class LRUKReplacer {
   // 给这个页框分配一个lrurecored类，并更新大小
   auto AllocateFrameRecord(size_t frame_id) -> void;
 
-  // 在set中删除，delete这个页框，最后更新大小
-  auto DeallocateFrameRecord(size_t frame_id, bool is_premature) -> void;
-  auto DeallocateFrameRecord(container_iterator it, bool is_premature) -> void;
-
   uint64_t curr_time_{0};
   size_t curr_size_{0};
   size_t replacer_size_{0};
