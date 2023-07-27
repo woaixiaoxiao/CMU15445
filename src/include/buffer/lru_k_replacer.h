@@ -47,14 +47,14 @@ class LRUKFrameRecord {
 };
 
 // 定义了访问次数小于k的情况下的set的比较规则
-struct PrematureFrameComp {
+struct LessKFrameComp {
   auto operator()(const LRUKFrameRecord *lhs, const LRUKFrameRecord *rhs) const -> bool {
     return lhs->EarliestAccessTime() < rhs->EarliestAccessTime();
   }
 };
 
 // 定义了访问次数大于等于k的情况下的set的比较规则
-struct MatureFrameComp {
+struct MoreKFrameComp {
   auto operator()(const LRUKFrameRecord *lhs, const LRUKFrameRecord *rhs) const -> bool {
     return lhs->LastKAccessTime() < rhs->LastKAccessTime();
   }
@@ -174,8 +174,8 @@ class LRUKReplacer {
   // 页框号->页框的统计信息类
   std::vector<LRUKFrameRecord *> frames_;
   // 记录可淘汰的页框，分别是访问次数小于k和大于等于k的
-  std::set<LRUKFrameRecord *, PrematureFrameComp> lru_premature_;
-  std::set<LRUKFrameRecord *, MatureFrameComp> lru_mature_;
+  std::set<LRUKFrameRecord *, LessKFrameComp> lessk_record_;
+  std::set<LRUKFrameRecord *, MoreKFrameComp> morek_record_;
 };
 
 }  // namespace bustub
