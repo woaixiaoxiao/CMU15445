@@ -31,16 +31,19 @@ namespace bustub {
 class LRUKFrameRecord {
  public:
   LRUKFrameRecord(size_t frame_id, size_t k);
+  // 访问操作
+  auto Access(uint64_t time) -> void;
+
   auto IsEvictable() const -> bool;
   auto SetEvictable(bool is_evictable) -> void;
-  auto Access(uint64_t time) -> void;
-  auto LastKAccessTime() const -> uint64_t;
-  auto EarliestAccessTime() const -> uint64_t;
+
+  auto LastAccessTime() const -> uint64_t;
+  auto AccessTimes() const -> size_t;
+
   auto GetFrameId() const -> size_t;
-  auto AccessSize() const -> size_t;
 
  private:
-  bool is_evictable_{false};
+  bool is_evictable_;
   size_t frame_id_;
   size_t k_;
   std::queue<uint64_t> access_records_;
@@ -49,14 +52,14 @@ class LRUKFrameRecord {
 // 定义了访问次数小于k的情况下的set的比较规则
 struct LessKFrameComp {
   auto operator()(const LRUKFrameRecord *lhs, const LRUKFrameRecord *rhs) const -> bool {
-    return lhs->EarliestAccessTime() < rhs->EarliestAccessTime();
+    return lhs->LastAccessTime() < rhs->LastAccessTime();
   }
 };
 
 // 定义了访问次数大于等于k的情况下的set的比较规则
 struct MoreKFrameComp {
   auto operator()(const LRUKFrameRecord *lhs, const LRUKFrameRecord *rhs) const -> bool {
-    return lhs->LastKAccessTime() < rhs->LastKAccessTime();
+    return lhs->LastAccessTime() < rhs->LastAccessTime();
   }
 };
 
@@ -72,8 +75,6 @@ struct MoreKFrameComp {
  * classical LRU algorithm is used to choose victim.
  */
 class LRUKReplacer {
-  using container_iterator = std::set<LRUKFrameRecord *>::iterator;
-
  public:
   /**
    * @brief a new LRUKReplacer.

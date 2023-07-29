@@ -14,11 +14,7 @@
 
 namespace bustub {
 
-LRUKFrameRecord::LRUKFrameRecord(size_t frame_id, size_t k) : frame_id_(frame_id), k_(k) {}
-
-auto LRUKFrameRecord::IsEvictable() const -> bool { return is_evictable_; }
-
-auto LRUKFrameRecord::SetEvictable(bool is_evictable) -> void { is_evictable_ = is_evictable; }
+LRUKFrameRecord::LRUKFrameRecord(size_t frame_id, size_t k) : is_evictable_(false), frame_id_(frame_id), k_(k) {}
 
 auto LRUKFrameRecord::Access(uint64_t time) -> void {
   while (access_records_.size() >= k_) {
@@ -27,13 +23,15 @@ auto LRUKFrameRecord::Access(uint64_t time) -> void {
   access_records_.push(time);
 }
 
-auto LRUKFrameRecord::LastKAccessTime() const -> uint64_t { return access_records_.front(); }
+auto LRUKFrameRecord::IsEvictable() const -> bool { return is_evictable_; }
 
-auto LRUKFrameRecord::EarliestAccessTime() const -> uint64_t { return access_records_.front(); }
+auto LRUKFrameRecord::SetEvictable(bool is_evictable) -> void { is_evictable_ = is_evictable; }
+
+auto LRUKFrameRecord::LastAccessTime() const -> uint64_t { return access_records_.front(); }
+
+auto LRUKFrameRecord::AccessTimes() const -> size_t { return access_records_.size(); }
 
 auto LRUKFrameRecord::GetFrameId() const -> size_t { return frame_id_; }
-
-auto LRUKFrameRecord::AccessSize() const -> size_t { return access_records_.size(); }
 
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : k_(k) {
   // 初始化frames_的大小为frame的数量
@@ -74,8 +72,8 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
   // 这个页框是否可以被淘汰，即这个页框是否存在于某个set中
   auto is_evictable = frames_[frame_id]->IsEvictable();
   // 这个页框的访问数量是否小于k
-  bool has_lessk = frames_[frame_id]->AccessSize() < k_;
-  if (is_evictable && has_lessk && frames_[frame_id]->AccessSize() == (k_ - 1)) {
+  bool has_lessk = frames_[frame_id]->AccessTimes() < k_;
+  if (is_evictable && has_lessk && frames_[frame_id]->AccessTimes() == (k_ - 1)) {
     lessk_record_.erase(frames_[frame_id]);
   }
   if (is_evictable && (!has_lessk)) {
@@ -84,7 +82,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
   // 更新访问信息
   frames_[frame_id]->Access(CurrTime());
   // 如果之前在小于k的set中，并且再访问一次刚好进入等于k的set中，则插入
-  if (is_evictable && has_lessk && frames_[frame_id]->AccessSize() == k_) {
+  if (is_evictable && has_lessk && frames_[frame_id]->AccessTimes() == k_) {
     morek_record_.insert(frames_[frame_id]);
   }
   // 可能出现调整顺序的情况
@@ -100,7 +98,7 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
     return;
   }
   // 只有当前状态和要设置的状态不同时，才需要设置
-  auto is_lessk = frames_[frame_id]->AccessSize() < k_;
+  auto is_lessk = frames_[frame_id]->AccessTimes() < k_;
   // 从不可evict到可以evict
   if (set_evictable && !frames_[frame_id]->IsEvictable()) {
     replacer_size_++;
@@ -130,7 +128,7 @@ void LRUKReplacer::Remove(frame_id_t frame_id) {
     return;
   }
   // 如果有这个页框，则将这个页框从set中删除，并且delete掉，最后更新size
-  if (frames_[frame_id]->AccessSize() < k_) {
+  if (frames_[frame_id]->AccessTimes() < k_) {
     lessk_record_.erase(frames_[frame_id]);
   } else {
     morek_record_.erase(frames_[frame_id]);
